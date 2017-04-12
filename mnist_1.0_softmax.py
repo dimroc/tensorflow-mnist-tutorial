@@ -19,11 +19,6 @@ from tensorflow.contrib.learn.python.learn.datasets.mnist import read_data_sets
 import math
 tf.set_random_seed(0)
 
-# neural network with 1 layer of 10 softmax neurons
-#
-# · · · · · · · · · ·       (input data, flattened pixels)       X [batch, 784]        # 784 = 28 * 28
-# \x/x\x/x\x/x\x/x\x/    -- fully connected layer (softmax)      W [784, 10]     b[10]
-#   · · · · · · · ·                                              Y [batch, 10]
 
 # The model is:
 #
@@ -44,6 +39,7 @@ X = tf.placeholder(tf.float32, [None, 28, 28, 1])
 # correct answers will go here
 Y_ = tf.placeholder(tf.float32, [None, 10])
 lr = tf.placeholder(tf.float32)
+pkeep = tf.placeholder(tf.float32)
 
 # weights W[784, 10]   784=28*28
 # W = tf.Variable(tf.zeros([784, 10]))
@@ -53,9 +49,9 @@ lr = tf.placeholder(tf.float32)
 # [Dimitri] Add additional layers to the neural network:
 # three convolutional layers with their channel counts, and a
 # fully connected layer (tha last layer has 10 softmax neurons)
-K = 4  # first convolutional layer output depth
-L = 8  # second convolutional layer output depth
-M = 12  # third convolutional layer
+K = 6  # first convolutional layer output depth
+L = 12  # second convolutional layer output depth
+M = 24  # third convolutional layer
 N = 200  # fully connected layer
 
 W1 = tf.Variable(tf.truncated_normal([5, 5, 1, K], stddev=0.1))  # 5x5 patch, 1 input channel, K output channels
@@ -80,6 +76,7 @@ Y3 = tf.nn.relu(tf.nn.conv2d(Y2, W3, strides=[1, stride, stride, 1], padding='SA
 
 # reshape the output from the third convolution for the fully connected layer
 YY = tf.reshape(Y3, shape=[-1, 7 * 7 * M])
+YYd = tf.nn.dropout(YY, pkeep)
 
 Y4 = tf.nn.relu(tf.matmul(YY, W4) + B4)
 Ylogits = tf.matmul(Y4, W5) + B5
@@ -130,7 +127,7 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], feed_dict={X: batch_X, Y_: batch_Y})
+        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], feed_dict={X: batch_X, Y_: batch_Y, pkeep: 1})
         datavis.append_training_curves_data(i, a, c)
         datavis.append_data_histograms(i, w, b)
         datavis.update_image1(im)
@@ -138,13 +135,13 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels})
+        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels, pkeep: 1})
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
 
     # the backpropagation training step
-    sess.run(train_step, feed_dict={lr: learning_rate, X: batch_X, Y_: batch_Y})
+    sess.run(train_step, feed_dict={lr: learning_rate, X: batch_X, Y_: batch_Y, pkeep: 0.75})
 
 
 datavis.animate(training_step, iterations=3000+1, train_data_update_freq=10, test_data_update_freq=50, more_tests_at_start=True)
