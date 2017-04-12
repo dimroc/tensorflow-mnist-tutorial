@@ -50,13 +50,13 @@ Y_ = tf.placeholder(tf.float32, [None, 10])
 
 # [Dimitri] Add additional layers to the neural network:
 W1 = tf.Variable(tf.truncated_normal([28*28, 200] ,stddev=0.1))
-B1 = tf.Variable(tf.zeros([200]))
+B1 = tf.Variable(tf.ones([200])/10)
 
 W2 = tf.Variable(tf.truncated_normal([200, 100], stddev=0.1))
-B2 = tf.Variable(tf.zeros([100]))
+B2 = tf.Variable(tf.ones([100])/10)
 
 W3 = tf.Variable(tf.truncated_normal([100, 10], stddev=0.1))
-B3 = tf.Variable(tf.zeros([10]))
+B3 = tf.Variable(tf.ones([10])/10)
 
 # flatten the images into a single line of pixels
 # -1 in the shape definition means "the only possible dimension that will preserve the number of elements"
@@ -65,8 +65,8 @@ XX = tf.reshape(X, [-1, 784])
 
 # The model
 # Y = tf.nn.softmax(tf.matmul(XX, W) + b)
-Y1 = tf.nn.sigmoid(tf.matmul(XX, W1) + B1)
-Y2 = tf.nn.sigmoid(tf.matmul(Y1, W2) + B2)
+Y1 = tf.nn.relu(tf.matmul(XX, W1) + B1)
+Y2 = tf.nn.relu(tf.matmul(Y1, W2) + B2)
 Y = tf.nn.softmax(tf.matmul(Y2, W3) + B3)
 
 # loss function: cross-entropy = - sum( Y_i * log(Yi) )
@@ -85,7 +85,7 @@ correct_prediction = tf.equal(tf.argmax(Y, 1), tf.argmax(Y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 # training, learning rate = 0.005
-train_step = tf.train.GradientDescentOptimizer(0.005).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(0.005).minimize(cross_entropy)
 
 # matplotlib visualisation
 allweights = tf.reshape(W2, [-1])
