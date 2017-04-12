@@ -51,31 +51,38 @@ lr = tf.placeholder(tf.float32)
 # b = tf.Variable(tf.zeros([10]))
 
 # [Dimitri] Add additional layers to the neural network:
-W1 = tf.Variable(tf.truncated_normal([28*28, 200] ,stddev=0.1))
-B1 = tf.Variable(tf.ones([200])/10)
+# three convolutional layers with their channel counts, and a
+# fully connected layer (tha last layer has 10 softmax neurons)
+K = 4  # first convolutional layer output depth
+L = 8  # second convolutional layer output depth
+M = 12  # third convolutional layer
+N = 200  # fully connected layer
 
-W2 = tf.Variable(tf.truncated_normal([200, 100], stddev=0.1))
-B2 = tf.Variable(tf.ones([100])/10)
+W1 = tf.Variable(tf.truncated_normal([5, 5, 1, K], stddev=0.1))  # 5x5 patch, 1 input channel, K output channels
+B1 = tf.Variable(tf.ones([K])/10)
+W2 = tf.Variable(tf.truncated_normal([5, 5, K, L], stddev=0.1))
+B2 = tf.Variable(tf.ones([L])/10)
+W3 = tf.Variable(tf.truncated_normal([4, 4, L, M], stddev=0.1))
+B3 = tf.Variable(tf.ones([M])/10)
 
-W3 = tf.Variable(tf.truncated_normal([100, 10], stddev=0.1))
-B3 = tf.Variable(tf.ones([10])/10)
-
-# flatten the images into a single line of pixels
-# -1 in the shape definition means "the only possible dimension that will preserve the number of elements"
-XX = tf.reshape(X, [-1, 784])
-
-
-# probability for dropout
-# feed in 1 when testing, 0.75 when training
-pkeep = tf.placeholder_with_default(1.0, [])
+W4 = tf.Variable(tf.truncated_normal([7 * 7 * M, N], stddev=0.1))
+B4 = tf.Variable(tf.ones([N])/10)
+W5 = tf.Variable(tf.truncated_normal([N, 10], stddev=0.1))
+B5 = tf.Variable(tf.ones([10])/10)
 
 # The model
-# Y = tf.nn.softmax(tf.matmul(XX, W) + b)
-Y1 = tf.nn.relu(tf.matmul(XX, W1) + B1)
-Y1d = tf.nn.dropout(Y1, pkeep)
-Y2 = tf.nn.relu(tf.matmul(Y1d, W2) + B2)
-Y2d = tf.nn.dropout(Y2, pkeep)
-Ylogits = tf.matmul(Y2d, W3) + B3
+stride = 1  # output is 28x28
+Y1 = tf.nn.relu(tf.nn.conv2d(X, W1, strides=[1, stride, stride, 1], padding='SAME') + B1)
+stride = 2  # output is 14x14
+Y2 = tf.nn.relu(tf.nn.conv2d(Y1, W2, strides=[1, stride, stride, 1], padding='SAME') + B2)
+stride = 2  # output is 7x7
+Y3 = tf.nn.relu(tf.nn.conv2d(Y2, W3, strides=[1, stride, stride, 1], padding='SAME') + B3)
+
+# reshape the output from the third convolution for the fully connected layer
+YY = tf.reshape(Y3, shape=[-1, 7 * 7 * M])
+
+Y4 = tf.nn.relu(tf.matmul(YY, W4) + B4)
+Ylogits = tf.matmul(Y4, W5) + B5
 Y = tf.nn.softmax(Ylogits)
 
 # loss function: cross-entropy = - sum( Y_i * log(Yi) )
@@ -123,7 +130,7 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute training values for visualisation
     if update_train_data:
-        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], feed_dict={X: batch_X, Y_: batch_Y, pkeep: 1})
+        a, c, im, w, b = sess.run([accuracy, cross_entropy, I, allweights, allbiases], feed_dict={X: batch_X, Y_: batch_Y})
         datavis.append_training_curves_data(i, a, c)
         datavis.append_data_histograms(i, w, b)
         datavis.update_image1(im)
@@ -131,13 +138,13 @@ def training_step(i, update_test_data, update_train_data):
 
     # compute test values for visualisation
     if update_test_data:
-        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels, pkeep: 1})
+        a, c, im = sess.run([accuracy, cross_entropy, It], feed_dict={X: mnist.test.images, Y_: mnist.test.labels})
         datavis.append_test_curves_data(i, a, c)
         datavis.update_image2(im)
         print(str(i) + ": ********* epoch " + str(i*100//mnist.train.images.shape[0]+1) + " ********* test accuracy:" + str(a) + " test loss: " + str(c))
 
     # the backpropagation training step
-    sess.run(train_step, feed_dict={lr: learning_rate, pkeep: 0.75, X: batch_X, Y_: batch_Y})
+    sess.run(train_step, feed_dict={lr: learning_rate, X: batch_X, Y_: batch_Y})
 
 
 datavis.animate(training_step, iterations=3000+1, train_data_update_freq=10, test_data_update_freq=50, more_tests_at_start=True)
